@@ -1,0 +1,192 @@
+---
+title: "Tidying examples"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(generator)
+x <- read_csv('data/raw/plans_original.csv')
+x$Name <- r_full_names(nrow(x))
+x$`Email address` <- r_email_addresses(nrow(x))
+x <- x[, 1:6]
+head(x)
+glimpse(x)
+write_csv(x, 'data/raw/plans_raw.csv')
+```
+
+```{r}
+library(tidyverse)
+x <- read_csv('data/raw/plans_raw.csv')
+head(x)
+```
+
+What are the problems here?
+
+## What to share
+* Electronic personal information!
+
+## Trivial data handling
+* Unwieldy column names
+* Unparsed datetime
+    * What timezone? (We'll talk more about this in metadata)
+* Mistakes (double submission, ...)
+    * In human-error-prone data entry, manual check of inputted values could be needed
+
+```{r}
+x <- read_csv('data/raw/plans_raw.csv', 
+              col_types = list(col_datetime(format = '%m/%d/%Y %H:%M:%S'), 
+                               col_character(), 
+                               col_character(), 
+                               col_character(), 
+                               col_character(), col_character()),
+              col_names = c("time_submitted", "name", "email", "day1", "day2", "day3"),
+              skip = TRUE)
+head(x)
+```
+
+* Bad GForms export that doesn't quote each checkbox value separately
+
+```{r}
+# sometimes, data collection has shortcomings you couldn't eliminate at collection stage
+# we want to quote each
+
+# create ad-hoc function to do this correct when needed
+escape_multiple_values <- function(values) {
+  library(stringr)
+  # got these unique strings from Ctrl+F the form, but in larger datasets, things might be more difficult
+  to_quote = c("Saturday, July 29th, 7p", "Part 1: IRB, Part 2: Curating data", 
+               "transparent, reproducible, and fabulous", 
+               "department, university, society", 
+               "if there is a hackathon that needs help, let me know")
+  # we temporarily escape the separators
+  replacements = str_replace_all(to_quote, ',', '@+@')
+  names(replacements) <- to_quote
+  
+  # mapply(function(x, y) str_replace_all(values, x, y), to_quote, replacements)
+  str_replace_all(values, replacements)
+}
+escape_multiple_values(c("[Saturday, July 29th, 7p] Dinner/drinks party at Brian Nosek's home (bus transportation to/from Omni hotel all evening), Workshop: Fundamentals of meta-analysis (9:30a-12:30p), Workshop: How to Promote Transparency and Replicability as a Reviewer (1:30-3:30p), Workshop: Writing papers to be transparent, reproducible, and fabulous (3:30-5:30p)", "Workshop: How to Promote Transparency and Replicability as a Reviewer (1:30-3:30p), Workshop: Writing papers to be transparent, reproducible, and fabulous (3:30-5:30p), Hack: Resources for changing culture in department, university, society (all day), I am flexible; if there is a hackathon that needs help, let me know."))
+
+unescape_multiple_values <- function(values) {
+  str_replace_all(values, '@\\+@', ',')
+}
+```
+
+
+## Data format
+* Mixing different data sets (table of submission by person vs. table of plans)
+    * Discretion required -- do we need a separate table of events?
+
+```{r}
+people <- select(x, time_submitted, name, email)
+head(people)
+
+# if non-existent, create an ID to join the tables by -- normally, 
+# you'd probably have an ID for each participant, which you'd deidentify at this stop
+people$participant_ID = sample(1:nrow(people), nrow(people))
+# separate out the dataset, enable later connection with index
+x <- merge(x, people) %>% select(-time_submitted, -name, -email)
+head(x)
+
+# we don't want to share this, but we could extract non-identifying information before we remove eP(H)I
+people <- transmute(people, 
+                    time_submitted, participant_ID,
+                    email_server = gsub('.+@([^@]+)$', '\\1', email),
+                    tld = gsub('.+\\.(\\w{1,7}$)', '\\1', email),
+                    number_names = length(strsplit(name, ' ')[[1]])
+)
+head(people)
+```
+
+* Data in column names (date)
+
+```{r}
+x <- gather(x, event_day, event, -participant_ID)
+x$event_day <- as.numeric(gsub('day', '', x$event_day)) # clean up
+head(x)
+```
+
+* Multiple records in a single row
+    * Multiple planned events in each cell
+
+```{r}
+# this is where we use the previous fix
+x$event <- escape_multiple_values(x$event)
+x <- separate_rows(x, event, sep = ', ')
+```
+```{r}
+# unescape the event titles
+x$event <- unescape_multiple_values(x$event)
+head(x)
+```
+* Multiple variables in a single column
+    * event time & event type in event
+
+```{r}
+# Mostly constant position (Type: name (time)), so extract it like that
+# This won't work for 
+xtest <- extract(x, event, 
+                 c('event_type', 'event_name', 'event_time'), 
+                 regex = "(^[[:alnum:]-]+): (.+) \\((.+)\\)$", 
+                 remove = FALSE)
+
+xtest %>% filter(is.na(event_type)) %>% select(event) %>% unique() # What events did this not work for?
+```
+
+```{r}
+# Get the ones that are worthwhile
+x$event[x$event == "[Saturday, July 29th, 7p] Dinner/drinks party at Brian Nosek's home (bus transportation to/from Omni hotel all evening)"] <- "Social: Dinner/drinks party at Brian Nosek's home (7p-?)"
+x$event[x$event == "All Conference Social Event (Dinner+drinks; 7:30p-??)"] <- "Social: All Conference Dinner & Drinks (7:30p-??)"
+x <- extract(x, event, 
+             c('event_type', 'event_name', 'event_time'), 
+             regex = "(^[[:alnum:]-]+): (.+) \\((.+)\\)$", 
+             remove = FALSE)
+x
+```
+
+* Different kinds of data in same column
+    * attendance in Saturday social in Sunday column
+* Multiple types of experimental unit in the same table
+    * no specific plans in Tuesday column
+  
+```{r}
+# different solutions here
+
+# with just one mis-dated event, we can just re-date it
+x$event_day[x$event_name == "Dinner/drinks party at Brian Nosek's home"] <- 0
+
+# "no specific plans" / "I'm flexible" is not, strictly speaking, a plan
+# -> might make sense to remove those, 
+# -> or, might make sense to convert them into a particular event kind?
+
+
+flexible_responses <- c("Everything else will be scheduled during the conference depending on what has legs and group interest", "I am flexible; if there is a hackathon that needs help, let me know.")
+
+# x <- filter(x, !(event %in% flexible_responses))
+# or perhaps:
+x$event_type[x$event %in% flexible_responses] <- "Flexible"
+
+# Discussion: under what circustances should you remove records?
+# (people who haven't checked anything - and thus have NA - might not be attending on that day or forgot to respond --)
+```
+
+* One type of experimental unit stored in multiple tables
+    * We avoided it when, after creating the `people` table, we removed those records from the `plans` table
+
+## Removing records?
+
+## Further clean-up
+* Add `event_date`
+* Convert `event_time` to `event_starttime` and `event_duration`
+* Remove `event`, as we've extracted everything out of it
+
+```{r}
+x <- select(x, -event)
+write_csv(x, 'data/clean/plans.csv')
+write_csv(people, 'data/clean/people.csv')
+```
+
+## Enables others to get started easily
+* graph of number of specific RSVP'd events vs. timestamp
+* attendance at social vs. number of events they plan to attend
