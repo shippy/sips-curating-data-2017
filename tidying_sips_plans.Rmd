@@ -1,6 +1,6 @@
 ---
 title: "Data curation: Tidy data & metadata"
-author: Simon Podhajsky
+author: Simon Podhajsky & David Condon
 date: July 30, 2017
 output: 
   revealjs::revealjs_presentation:
@@ -8,19 +8,23 @@ output:
     highlight: zenburn
 ---
 
-# Tidy data
+# Part 1: Tidy data
 
 ## Slogan
-> Write documentation for humans. Write data for computers.
+> Write code for humans. Write data for computers.
+>
+> -- Vince Buffalo, [Bioinformatics Data Skills](http://shop.oreilly.com/product/0636920030157.do)
 
 ## What challenges do _you_ face?
 
 ## Note on file organization
 
- `data/raw/`
- `data/clean/`
- `processing/`
- `analysis/`
+```
+ data/raw/
+ data/clean/
+ processing/
+ analysis/
+```
 
 
 ## Note on file formats
@@ -51,7 +55,7 @@ Preferred:
 > * What separates observations from variables? (`work_phone` vs. `home_phone`)
 > * Might depend on context and discretion, but broad intuitions apply broadly
 
-## Negative definition
+## Negative definition: tidy ~ not messy
 
 Messy data is usually messy in the following ways:
 
@@ -61,11 +65,9 @@ Messy data is usually messy in the following ways:
 > * Multiple types of experimental unit stored in the same table
 > * One type of experimental unit stored in multiple tables
 
-## Origin
+## Origin of "tidy data"
 
-[Hadley Wickham's (2014) Tidy Data paper.](https://www.jstatsoft.org/article/view/v059i10) 
-
-Do read it for details and more formal definitions.
+[Hadley Wickham's (2014) Tidy Data paper.](https://www.jstatsoft.org/article/view/v059i10) Do read it if you can.
 
 # Messy dataset example: Your plans for SIPS
 
@@ -83,8 +85,9 @@ write_csv(x, 'data/raw/plans_raw.csv')
 
 ----
 
-* Remember that form you filled out? We'll look at the CSV output from Google Forms.
+* Remember [that form you filled out?](SIPS 2017 RSVP Survey.pdf) We'll look at the CSV output from Google Forms.
 * (Examples are a little `R` heavy, but many tools do the same)
+* Only code excerpts shown; for full code, see the Rmd file.
 
 ```{r, include=FALSE}
 library(tidyverse)
@@ -92,27 +95,26 @@ library(knitr)
 x <- read_csv('data/raw/plans_raw.csv')
 ```
 
-## What are the problems here? (1/2)
+## Dataset excerpt (1/2)
 
 ```{r, asis=TRUE}
 knitr::kable(x[106, 1:4], row.names = FALSE)
 ```
-----
 
-## What are the problems here? (2/2)
+## Dataset excerpt (2/2)
 
 ```{r, echo=FALSE, asis = TRUE}
 knitr::kable(x[106, 5:6], row.names = FALSE)
 ```
-----
 
-## Basic issues
+## What are the problems here?
 > * Unwieldy column names
 > * What timezone is the datetime? _(More in the *Metadata* section)_
 > * Ambiguous use of commas
-> * Identifying personal information
-> * Brian's social is listed on the wrong day
+> * Identifying personal information!
+> * Brian's social event is listed on the wrong day
 > * _Mistakes? (Double submission, ...)_
+> * And, of course, not tidy
 
 ----
 
@@ -127,27 +129,27 @@ x <- read_csv('data/raw/plans_raw.csv',
                 col_character(), col_character(), 
                 col_character(), col_character(),
                 col_character()),
-              skip = 1) # skip 1 row (headers)
+              skip = 1) # skip row with headers
 head(x)
 ```
 
 ----
 
-
-
 ```{r}
 knitr::kable(x[106, 4:6], row.names = FALSE)
 ```
 
-## Mess #1: mixing different data sets
-> * Our datasets centers on plans for specific events. Why do we have people's emails here?
-> * _This becomes especially problematic with the next mess._
+Now, let's talk about what makes this messy.
 
-(tidy data illustration)
+## Mess #1: mixing different data sets
+> * Our datasets centers on plans for specific events. Why should we have people's emails here?
+> * If we need to do any processing on a per-person level, things become unwieldy fast.
+
+![](img/tidy-data.png)
 
 ----
 
-**Tidy solution:** divide the data units into tables you can re-merge
+**Tidy solution:** divide the data units into tables you can merge as needed
 
 ```{r}
 people <- select(x, time_submitted, name, email) %>% unique()
@@ -159,10 +161,11 @@ people$data_origin <- 'plans_raw.csv' # if many possible sources
 people$participant_ID = sample(1:nrow(people), nrow(people))
 
 # separate out the dataset, enable later connection with index
-x <- merge(x, people) %>% select(-time_submitted, -name, -email)
+x <- merge(x, people) %>% select(-time_submitted, -name, 
+                                 -email, -data_origin)
 ```
 
-> * _Should we separate the table of events and plans, too?_
+> * _**Question:** Should we separate the table of events and plans, too?_
 
 ----
 
@@ -186,7 +189,7 @@ knitr::kable(people[1, ], row.names = FALSE)
 ## Mess #2: Data stored in column names
 
 > * Each column stores the date on which the event is held.
-> * Even though we renamed it from `...August 1` to `day1`, that is still plan-level info
+> * Even though we renamed it from `What are you planning to do on August 1` to `day1`, that is still plan-level info.
 
 
 ```{r, echo = FALSE}
@@ -209,13 +212,11 @@ knitr::kable(x[106:107, ], row.names = FALSE)
 
 ## Mess #3: Multiple records in a single row
 > * As many plans as there were checkboxes
-> * Doing any sort of math on this is annoying
+> * Doing any analysis of event attendance is hard
 
 ----
 
-**Tidy solution:** One row per one planned event
-
-_(assuming we fixed the comma issue)_
+**Tidy solution:** One row per one intention to attend an event
 
 ```{r, echo = FALSE}
 # we want to quote the content of each cell, or escape the commas that aren't descriptive
@@ -242,7 +243,7 @@ unescape_multiple_values <- function(values) {
 ```
 
 ```{r, echo = FALSE}
-# this is where we use the previous fix
+# not shown: function that escapes non-separator commas
 x$event <- escape_multiple_values(x$event)
 ```
 ```{r}
@@ -268,7 +269,9 @@ x$event_day[x$event == paste0("[Saturday, July 29th, 7p] ",
 knitr::kable(x[106, ], row.names = FALSE)
 ```
 
-> * All mashed up in `event`: event time, event name, and event type
+What's wrong here?
+
+> * All mashed up in `event`: event time, event name, **and** event type
 
 ----
 
@@ -308,7 +311,7 @@ x <- extract(x, event,
 >     * _Relevant: What does a plan for `NA` event mean?_
 
 ```{r, echo = FALSE}
-knitr::kable(x[106, ], row.names = FALSE)
+knitr::kable(x[114, ], row.names = FALSE)
 ```
 
 ----
@@ -352,9 +355,8 @@ knitr::kable(x[106, ], row.names = FALSE)
 ## Tidy data are like a toothpaste
 
 > * A tidy dataset is easy to push into "messy" forms, but backwards doesn't work quite as well.
-> * Quick exploration!
 
-## Question 1
+## Quick exploration 1
 
 ```{r, echo = FALSE}
 library(ggplot2)
@@ -381,7 +383,7 @@ popularity +
   ggtitle("Which events are most appealing in each day?")
 ```
 
-## Question 2
+## Quick exploration 2
 
 ```{r, echo = FALSE}
 ggplot(people,
@@ -394,7 +396,7 @@ ggplot(people,
 ```
 
 
-## Question 3
+## Quick exploration 3
 
 ```{r, echo = FALSE}
 all = merge(x, people) # by = 'participant_ID' is implied
@@ -411,81 +413,91 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ## It's not just R
 
-* Google Refine
-* Data Wrangler
-* Excel "Table" + pivot table shenanigans
+* [OpenRefine](https://openrefine.org) (formerly Google Refine)
+* [Trifacta Wrangler](https://www.trifacta.com/products/wrangler/) (formerly [Data Wrangler](http://vis.stanford.edu/wrangler/))
+* Excel "Table" + pivot table shenanigans?
 * All statistical software has some version of reshaping tools
 
 ----
 
 ...but if you're looking for R, [`tidyverse`](http://tidyverse.org/) is excellent
 
-# Tidy woes?
+# Your tidy woes?
 
-# Metadata
+# Part 2: Metadata
 
 ----
 
 > * Study- and table-level documentation
 > * How the data was collected & why
 
-## The time to document metadata is always
+## Always be documenting
 
-![](metadata-circle.png)
+![](img/metadata-circle.png)
 
 # Option 1: Standardized metadata
 
-* Most common in social science: DDI (Documenting Data Initiative)
+----
+
+* Most common in social science: [DDI (Documenting Data Initiative)](http://www.ddialliance.org/)
     * Lifecycle standard
     * Slimmed-down Codebook standard
+    * [Examples on the DDI website](http://www.ddialliance.org/resources/markup-examples)
 * Alternative standards exist: [Dublin Core](http://dublincore.org/), [MINSEQE](http://fged.org/projects/minseqe/) (genomics), [MIBBI](https://biosharing.org/standards/?selected_facets=isMIBBI:true&view=table) (biology + biomedicine), ...
 
 ----
 
-![](https://imgs.xkcd.com/comics/standards.png)
+![](img/xkcd_standards.png)
 
 ## Pros
 
 > * Very, **very** thoroughly standardized & documented
-> * XML, so machine-readable
+> * XML means machine-readability
 > * Connects into other existing frameworks
 > * Ideal for extensive datasets
 
 ## Cons
 
 * Far too thoroughly standardized - steep learning curve
-* XML, so not super human-friendly
+* XML does not mean human readability
 * Overkill for small-ish datasets
 
 ## Tools
 
 * [Colectica software](http://www.colectica.com), especially the free [Colectica for Excel](http://www.colectica.com/software/colecticaforexcel) (Windows-only)
 * [Archivist](https://github.com/CLOSER-Cohorts/archivist) by UK's CLOSER
-* XML editors: 
+* [Nesstar](http://www.nesstar.com/software/publisher.html)
+* [...and DDI has a comprehensive list of others](https://www.ddialliance.org/resources/tools)
 
 # Option 2: "Readme" metadata
+
+## "Readme" metadata
 
 * Flexible description in plain text
 * Many templates available - [Cornell Library has an excellent one](https://cornell.app.box.com/v/ReadmeTemplate)
 
 # Documenting our SIPS dataset
 
+## We'll be using the Cornell template
+
 ## Basics
 1. Title of Dataset: **Preliminary plans of SIPS 2017 attendeees**
 2. Author Information
     * Principal Investigator Contact Information
-        * Name: **David Condon**
-            * Institution: Northwestern University
-            * Email: david-condon@northwestern.edu
+          * Name: **David Condon**
+              * Institution: Northwestern University
+              * Email: david-condon@northwestern.edu
     * Associate or Co-investigator Contact Information
-        * Name: **Simon Podhajsky**
-            * Institution: Yale University
-            * Email: simon.podhajsky@yale.edu
+          * Name: **Simon Podhajsky**
+              * Institution: Yale University
+              * Email: simon.podhajsky@yale.edu
 3. Date of data collection (single date, range, approximate date) **20170713-20170725**
+
+## Basics (cont'd)
 4. Geographic location of data collection (where was data collected?): **online**
 5. Information about funding sources that supported the collection of the data: **COS / its funders**
 
-## Basics (cont'd)
+## Sharing / access information
 1. Licenses/restrictions placed on the data: **MIT**
 2. Links to publications that cite or use the data: -
 3. Links to other publicly accessible locations of the data: -
@@ -495,23 +507,23 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ## Data and file overview
 1. File List
-   A. Filename: **`people.csv`** 
-      Short description: Properties of SIPS attendees
-   B. Filename: **`event_plans.csv`**     
-      Short description: Plans for events by participant, with description of events
+    A. Filename: **`people.csv`** 
+        * Short description: Properties of SIPS attendees
+    B. Filename: **`event_plans.csv`**     
+        * Short description: Plans for events by participant, with description of events
 2. Relationship between files: **`people.csv` provides participant data for `event_plans.csv` (one-to-many)**
 3. Additional related data collected that was not included in the current data package: **~~flexible plans,~~ participant registration**
 
 ## Data and file overview (cont'd)
 4. Are there multiple versions of the dataset? **no**
-   If yes, list versions:
-           Name of file that was updated:
-                     i. Why was the file updated? 
-                ii. When was the file updated?
+    * If yes, list versions:
+    * Name of file that was updated:
+        i. Why was the file updated? 
+        ii. When was the file updated?
 
 ## Methodological information
 1. Description of methods used for collection/generation of data (include references): **Google Form sent to registered participants via e-mail**
-2. Methods for processing the data: **Export to CSV, then running `tidying_sips_plans.Rmd`**
+2. Methods for processing the data: **Export to CSV, then run `tidying_sips_plans.Rmd`**
 3. Instrument- or software-specific information needed to interpret the data: **none, but R 3.4+ preferred**
 4. Standards and calibration information, if appropriate: **-**
 
@@ -525,12 +537,12 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 1. Number of variables: **5**
 2. Number of cases/rows: **1260**
 3. Variable List
-    A. Name: **`participant_ID`**
-       * Description: **unique participant index linked to the person data in `people.csv`**
-    B. Name: **`event_type`**
-       * Description: **The format of the event the participant is planning to attend**
-       * Possible values: **Social, Hack, Re-hack, Workshop, Flexible, `NA`** _(and meanings)_
-    C. Name: **...**
+     A. Name: **`participant_ID`**
+          * Description: **unique participant index linked to the person data in `people.csv`**
+     B. Name: **`event_type`**
+          * Description: **The format of the event the participant is planning to attend**
+          * Possible values: **Social, Hack, Re-hack, Workshop, Flexible, `NA`** _(and meanings)_
+     C. Name: **...**
 
 ## `event_plans.csv` (cont'd)
 
@@ -541,10 +553,13 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 ...
 
 # Resources
-* Tidyverse (original paper, presentation, write-up, book)
-* `tidyverse` (`dplyr` and `tidyr`) R package cheatsheet
-* UC Mercedes recommendations on file management
-* Documenting Data Initiative
-    * Video presentations are least impenetrable
-* ICSPR
+
+----
+
+* [Tidyverse] ([original paper](https://www.jstatsoft.org/article/view/v059i10), presentation, write-up, book)
+* [R data wrangling cheatsheet](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf)
 * Cornell's Research Data Management Service Group on metadata
+* UC Mercedes recommendations on [data curation](http://library.ucmerced.edu/research/researchers/research-data-curation), [file management](http://library.ucmerced.edu/research/researchers/research-data-management/best-practices-managing-your-data), and [archiving + sharing](http://library.ucmerced.edu/research/researchers/research-data-management/archiving-and-sharing-your-data)
+* [Documenting Data Initiative](http://www.ddialliance.org)
+    * I've found video presentations are least impenetrable
+* ICSPR
