@@ -55,34 +55,41 @@ METHODOLOGICAL INFORMATION
 6. Describe any quality-assurance procedures performed on the data: **-**
 7. People involved with sample collection, processing, analysis and/or submission: **Katie & Brian & others in the SIPS 2017 org team (collection), Simon (processing & analysis), David (submission)**
 
------------------------------------------
-DATA-SPECIFIC INFORMATION FOR: [FILENAME]
------------------------------------------
-<create sections for each dataset (or file if appropriate) included>
+## Data-specific information
 
+### `event_plans.csv`
 
-1. Number of variables:
-
-
-2. Number of cases/rows: 
-
-
+1. Number of variables: **5**
+2. Number of cases/rows: **1260**
 3. Variable List
-    A. Name: [variable name]
-       Description: [description of the variable]
-                    Value labels if appropriate
-
-
-
-    B. Name: [variable name]
-       Description: [description of the variable]
-                    Value labels if appropriate
-
-
-
+     A. Name: **`participant_ID`**
+          * Description: **unique participant index linked to the person data in `people.csv`**
+     B. Name: **`event_type`**
+          * Description: **The format of the event the participant is planning to attend**
+          * Possible values: **Social, Hack, Re-hack, Workshop, Flexible, `NA`** _(and meanings)_
+     C. Name: **`event_time`**
+          * Description: **The start and, if applicable, end of the event**
+          * Possible values: **No standard format ("12p-1a")**
+     D. Name: **`event_day`**
+          * Description: **The day on which the event takes place, relative to the conference start**
+          * Possible values: **0-3**
 4. Missing data codes:
-        Code/symbol        Definition
-        Code/symbol        Definition
+     * `NA`: **No checkbox selected for a given day / data cannot be provided for the given event**
+5. Specialized formats of other abbreviations used: **-**
 
-
-5. Specialized formats of other abbreviations used
+### `people.csv`
+1. Number of variables: **5**
+2. Number of cases/rows: **166**
+3. Variable List
+     A. Name: **`participant_ID`**
+          * Description: **unique participant index**
+          * Possible values: **non-repeating integers**
+     B. Name: **`time_submitted`**
+          * Description: **The timestamp in ET timezone at which the submission was received by Google servers**
+     C. Name: **`email_server`**
+          * Description: **The part of the email address after the '@' sign**
+     D. Name: **`number_names`**
+          * Description: **The number of space-separated names that the participant listed**
+          * Possible values: 1-4
+4. Missing data codes: **-**
+5. Specialized formats of other abbreviations used: **-**

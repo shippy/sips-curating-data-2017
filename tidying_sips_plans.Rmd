@@ -8,6 +8,13 @@ output:
     highlight: zenburn
 ---
 
+## Outline
+
+The steps needed to get a shareable dataset!
+
+1. Getting your data set tidied up
+2. Creating metadata documentation
+
 # Part 1: Tidy data
 
 ## Slogan
@@ -34,7 +41,9 @@ We will be sharing two files _at minimum_
 Preferred:
 
 * plain text
-* open (non-proprietary) format (= I don't need to buy software to view this)
+* open (non-proprietary) format
+    * I don't need to buy software to view this
+    * Ideally, I don't need to _install_ software to view this
 
 ## Data is tidy if...
 
@@ -42,7 +51,7 @@ Preferred:
 2. each variable occupies a single column
 3. one type of observations resides in a single table.
 
-----
+## Data is tidy if...
 
 1. each observation occupies a single row
 2. each variable occupies a single column
@@ -71,6 +80,8 @@ Messy data is usually messy in the following ways:
 > * Multiple types of experimental unit stored in the same table
 > * One type of experimental unit stored in multiple tables
 
+We'll go over each in the example.
+
 ## Origin of "tidy data"
 
 [Hadley Wickham's (2014) Tidy Data paper.](https://www.jstatsoft.org/article/view/v059i10) Do read it if you can.
@@ -93,7 +104,7 @@ write_csv(x, 'data/raw/plans_raw.csv')
 
 * Remember [that form you filled out?](SIPS 2017 RSVP Survey.pdf) We'll look at the CSV output from Google Forms.
 * (Examples are a little `R` heavy, but many tools do the same)
-* Only code excerpts shown; for full code, see the Rmd file.
+* Only code excerpts shown; for full code, [check out the RMarkdown source of this presentation.](https://github.com/shippy/sips-curating-data-2017/blob/master/tidying_sips_plans.Rmd)
 
 ```{r, include=FALSE}
 library(tidyverse)
@@ -115,11 +126,13 @@ knitr::kable(x[106, 5:6], row.names = FALSE)
 
 ## What are the problems here?
 > * Unwieldy column names
-> * What timezone is the datetime? _(More in the *Metadata* section)_
-> * Ambiguous use of commas
-> * Identifying personal information!
-> * Brian's social event is listed on the wrong day
-> * _Mistakes? (Double submission, ...)_
+> * Ambiguous commas - some separate plans, others are used in a sentence
+>     * "Workshop: Using OSF (1:30-3:30p), Workshop: Writing papers to be transparent, reproducible, and fabulous (3:30-5:30p)"
+> * Identifying personal information
+> * Data mistakes?
+>     * Brian's social event is listed on the wrong day
+>     * What timezone is the datetime? _(More in the *Metadata* section)_
+>     * Double submissions?
 > * And, of course, not tidy
 
 ----
@@ -166,7 +179,7 @@ people$data_origin <- 'plans_raw.csv' # if many possible sources
 # this point, which you'd now deidentify.)
 people$participant_ID = sample(1:nrow(people), nrow(people))
 
-# separate out the dataset, enable later connection with index
+# remove the people-specific data from `x`
 x <- merge(x, people) %>% select(-time_submitted, -name, 
                                  -email, -data_origin)
 ```
@@ -175,22 +188,21 @@ x <- merge(x, people) %>% select(-time_submitted, -name,
 
 ----
 
-As a bonus, sensitive info is relegated to a single spot, and is easier to deal with:
+As a bonus, sensitive info is relegated to a single spot, and is easier to deal with - for example, extract non-identifying features of interest:
 
 ```{r}
-# we don't want to share the name info, but we can extract 
-# non-identifying metadata of interest
+# dplyr::transmute drops all columns that are not explicitly named
 people <- transmute(people, 
                     time_submitted, participant_ID,
                     email_server = gsub('.+@([^@]+)$', '\\1', email),
-                    tld = gsub('.+\\.(\\w{1,7}$)', '\\1', email),
                     number_names = length(strsplit(name, ' ')[[1]])
 )
 ```
 ```{r, echo=FALSE, asis = TRUE}
 knitr::kable(people[1, ], row.names = FALSE)
 ```
-----
+
+Of course, this might still be identifying information - consult your local HIPAA board.
 
 ## Mess #2: Data stored in column names
 
@@ -214,7 +226,7 @@ x$event_day <- as.numeric(gsub('day', '', x$event_day)) # clean up
 knitr::kable(x[106:107, ], row.names = FALSE)
 ```
 
-* _Side effect: some people are now planning for `NA`. Why?_
+* _Side effect to note for later: some people are now planning for `NA`. Why?_
 
 ## Mess #3: Multiple records in a single row
 > * As many plans as there were checkboxes
@@ -248,20 +260,16 @@ unescape_multiple_values <- function(values) {
 }
 ```
 
-```{r, echo = FALSE}
+```{r}
 # not shown: function that escapes non-separator commas
 x$event <- escape_multiple_values(x$event)
-```
-```{r}
 x <- separate_rows(x, event, sep = ', ')
-```
-```{r, echo = FALSE}
 # unescape the event titles
 x$event <- unescape_multiple_values(x$event)
 ```
 ----
 
-We can now easily fix the mis-dating of Brian's social, which - as an artifact of survey design - would otherwise still be considered a Day 1 event:
+We can now easily fix the mis-dating of Brian's social event, which - as an artifact of survey design - would otherwise still be considered a Day 1 event:
 
 ```{r}
 # With just one mis-dated event, we can just re-date it
@@ -309,6 +317,9 @@ x <- extract(x, event,
              regex = "(^[[:alnum:]-]+): (.+) \\((.+)\\)$", 
              remove = FALSE)
 ```
+```{r, echo = FALSE}
+knitr::kable(x[106, ], row.names = FALSE)
+```
 
 ## Mess #5: Multiple types of experimental unit in the same table
 
@@ -333,10 +344,14 @@ flexible_responses <- c("Everything else will be scheduled during the conference
 x$event_type[x$event %in% flexible_responses] <- "Flexible"
 ```
 
+```{r, echo = FALSE}
+knitr::kable(x[114, ], row.names = FALSE)
+```
+
 ## Mess #6: One type of experimental unit stored in multiple tables
 
-> * Can you imagine examples?
-> * If we had a separate survey which also asked identifying info, the `people` table would probably run into duplicates.
+> * Bullet we dodged, but can you imagine examples?
+> * If the Plans GForm asked for participant dietary restrictions, and the Lightning Talk GForm asked for participant age, both should be extracted into logical places
 
 ## Could we make things even cleaner?
 > * Add `event_date`
@@ -511,19 +526,21 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ## Data and file overview
 1. File List
-    A. Filename: **`people.csv`** 
-        * Short description: Properties of SIPS attendees
-    B. Filename: **`event_plans.csv`**     
-        * Short description: Plans for events by participant, with description of events
+    a. Filename: **`people.csv`** 
+        * Short description: **Properties of SIPS attendees**
+    b. Filename: **`event_plans.csv`**     
+        * Short description: **Plans for events by participant, with description of events**
 2. Relationship between files: **`people.csv` provides participant data for `event_plans.csv` (one-to-many)**
 3. Additional related data collected that was not included in the current data package: **~~flexible plans,~~ participant registration**
 
 ## Data and file overview (cont'd)
 4. Are there multiple versions of the dataset? **no**
-    * If yes, list versions:
-    * Name of file that was updated:
-        i. Why was the file updated? 
-        ii. When was the file updated?
+    * If yes, list versions: -
+    * Name of file that was updated: -
+        i. Why was the file updated? -
+        ii. When was the file updated? -
+        
+_Question: is this necessary if you use version control?_
 
 ## Methodological information
 1. Description of methods used for collection/generation of data (include references): **Google Form sent to registered participants via e-mail**
@@ -541,12 +558,12 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 1. Number of variables: **5**
 2. Number of cases/rows: **1260**
 3. Variable List
-     A. Name: **`participant_ID`**
+     a. Name: **`participant_ID`**
           * Description: **unique participant index linked to the person data in `people.csv`**
-     B. Name: **`event_type`**
+     b. Name: **`event_type`**
           * Description: **The format of the event the participant is planning to attend**
           * Possible values: **Social, Hack, Re-hack, Workshop, Flexible, `NA`** _(and meanings)_
-     C. Name: **...**
+     c. Name: **...**
 
 ## `event_plans.csv` (cont'd)
 
