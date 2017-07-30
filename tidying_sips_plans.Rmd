@@ -15,7 +15,7 @@ output:
 >
 > -- Vince Buffalo, [Bioinformatics Data Skills](http://shop.oreilly.com/product/0636920030157.do)
 
-## What challenges do _you_ face?
+## First: What challenges do _you_ face?
 
 ## Note on file organization
 
@@ -24,25 +24,31 @@ output:
  data/clean/
  processing/
  analysis/
+ README
 ```
 
+We will be sharing two files _at minimum_
 
 ## Note on file formats
 
 Preferred:
 
-> * plain text
-> * open (non-proprietary) format (= I don't need to buy software to view this)
+* plain text
+* open (non-proprietary) format (= I don't need to buy software to view this)
 
 ## Data is tidy if...
 
-> 1. each observation occupies a single row
-> 2. each variable occupies a single column
-> 3. one type of observations resides in a single table.
+1. each observation occupies a single row
+2. each variable occupies a single column
+3. one type of observations resides in a single table.
 
 ----
 
-![](tidy-data.png)
+1. each observation occupies a single row
+2. each variable occupies a single column
+3. one type of observations resides in a single table.
+
+![](img/tidy-data.png)
 
 ## Easy?
 
@@ -344,6 +350,7 @@ x$event_type[x$event %in% flexible_responses] <- "Flexible"
 x <- select(x, -event)
 write_csv(x, 'data/clean/event_plans.csv')
 write_csv(people, 'data/clean/people.csv')
+save(people, x, file = 'data/clean/all_data.Rdata')
 ```
 ```{r, echo = FALSE}
 knitr::kable(x[106, ], row.names = FALSE)
@@ -356,9 +363,9 @@ knitr::kable(x[106, ], row.names = FALSE)
 
 > * A tidy dataset is easy to push into "messy" forms, but backwards doesn't work quite as well.
 
-## Quick exploration 1
+## Quick exploration is easy
 
-```{r, echo = FALSE}
+```{r, eval=FALSE, include=FALSE}
 library(ggplot2)
 library(forcats)
 theme_set(theme_bw() + theme(title = element_text(size = 16), 
@@ -372,18 +379,11 @@ popularity <- ggplot(x %>% filter(event_day %in% 1:2),
   ggtitle("Which events are most appealing?") +
   theme_bw() + theme(axis.text.x = element_text(angle = 70, hjust = 1))
 popularity
-```
-
-----
-
-```{r, echo = FALSE}
 popularity + 
   facet_wrap(~ event_day, scales = "free", nrow = 1, 
              labeller = as_labeller(function(x) paste0("Day ", x))) +
   ggtitle("Which events are most appealing in each day?")
 ```
-
-## Quick exploration 2
 
 ```{r, echo = FALSE}
 ggplot(people,
@@ -396,7 +396,7 @@ ggplot(people,
 ```
 
 
-## Quick exploration 3
+----
 
 ```{r, echo = FALSE}
 all = merge(x, people) # by = 'participant_ID' is implied
@@ -428,8 +428,9 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ----
 
-> * Study- and table-level documentation
-> * How the data was collected & why
+* How the data was collected & why --- study- and table-level documentation
+* Follows naturally from a clean dataset
+* Allows for usability and findability
 
 ## Always be documenting
 
@@ -448,6 +449,9 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 ----
 
 ![](img/xkcd_standards.png)
+
+## More on DDI
+
 
 ## Pros
 
@@ -503,7 +507,7 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 3. Links to other publicly accessible locations of the data: -
 4. Links/relationships to ancillary data sets: **~~SIPS 2017 registrations~~**
 5. Was data derived from another source? -
-6. Recommended citation for the data: **_forthcoming_**
+6. Recommended citation for the data: **_We'll soon have one!_**
 
 ## Data and file overview
 1. File List
