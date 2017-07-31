@@ -59,6 +59,8 @@ Preferred:
 
 ![](img/tidy-data.png)
 
+<small>(source: [Chapter 12 of _R for Data Science_](http://r4ds.had.co.nz/tidy-data.html#fig:tidy-structure))</small>
+
 ## Easy?
 
 ## Yeah, right
@@ -70,7 +72,7 @@ Preferred:
 > * What separates observations from variables? (`work_phone` vs. `home_phone`)
 > * Might depend on context and discretion, but broad intuitions apply broadly
 
-## Negative definition: tidy ~ not messy
+## Negative take: tidy ~ not messy
 
 Messy data is usually messy in the following ways:
 
@@ -86,9 +88,12 @@ We'll go over each in the example.
 
 [Hadley Wickham's (2014) Tidy Data paper.](https://www.jstatsoft.org/article/view/v059i10) Do read it if you can.
 
+(much of this presentation is modeled on [his original slides](http://stat405.had.co.nz/lectures/18-tidy-data.pdf))
+
 # Messy dataset example: Your plans for SIPS
 
 ```{r, eval=FALSE, include=FALSE}
+# This is how I edited the original export
 library(tidyverse)
 library(generator)
 x <- read_csv('data/raw/plans_original.csv')
@@ -311,7 +316,8 @@ x$event[x$event == "All Conference Social Event (Dinner+drinks; 7:30p-??)"] <- "
 # Structure of `event` is stable (Type: name (time)), so 
 # a regular expression can extract it
 #
-# (Not shown: slight data manipulation to make this work for all events)
+# (Not shown: slight data manipulation to make this work 
+#  for all events)
 x <- extract(x, event, 
              c('event_type', 'event_name', 'event_time'), 
              regex = "(^[[:alnum:]-]+): (.+) \\((.+)\\)$", 
@@ -451,10 +457,13 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ![](img/metadata-circle.png)
 
+<small>(source: [Wendy Thomas and Marcel Hebing 2013 presentation on DDI](http://www.ddialliance.org/system/files/Thomas-Hebing-2013-EDDI.pptx))</small>
+
 # Option 1: Standardized metadata
 
-----
+## Standardized metadata
 
+* There are many standards~~, and they have a plan~~
 * Most common in social science: [DDI (Documenting Data Initiative)](http://www.ddialliance.org/)
     * Lifecycle standard
     * Slimmed-down Codebook standard
@@ -465,8 +474,9 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ![](img/xkcd_standards.png)
 
-## More on DDI
+<small>(source: <https://xkcd.com/927/>)</small>
 
+## More on DDI
 
 ## Pros
 
@@ -514,7 +524,7 @@ ggplot(all %>% group_by(participant_ID, time_submitted) %>% summarize(number_pla
 
 ## Basics (cont'd)
 4. Geographic location of data collection (where was data collected?): **online**
-5. Information about funding sources that supported the collection of the data: **COS / its funders**
+5. Information about funding sources that supported the collection of the data: **COS/SIPS and its funders**
 
 ## Sharing / access information
 1. Licenses/restrictions placed on the data: **MIT**
@@ -577,10 +587,10 @@ _Question: is this necessary if you use version control?_
 
 ----
 
-* [Tidyverse] ([original paper](https://www.jstatsoft.org/article/view/v059i10), presentation, write-up, book)
+* Tidyverse ([original paper](https://www.jstatsoft.org/article/view/v059i10), presentation, write-up, & book)
 * [R data wrangling cheatsheet](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf)
-* Cornell's Research Data Management Service Group on metadata
+* [Cornell's Research Data Management Service Group on metadata](https://data.research.cornell.edu/content/writing-metadata) (and other articles)
 * UC Mercedes recommendations on [data curation](http://library.ucmerced.edu/research/researchers/research-data-curation), [file management](http://library.ucmerced.edu/research/researchers/research-data-management/best-practices-managing-your-data), and [archiving + sharing](http://library.ucmerced.edu/research/researchers/research-data-management/archiving-and-sharing-your-data)
 * [Documenting Data Initiative](http://www.ddialliance.org)
-    * I've found video presentations are least impenetrable
-* ICSPR
+    * The [presentations in the Training Library](http://www.ddialliance.org/training/training-library) are easiest to digest
+* University of Michigan's [ICPSR](https://www.icpsr.umich.edu), especially its [Guide to Social Science Data Preparation and Archiving](https://www.icpsr.umich.edu/icpsrweb/content/deposit/guide/index.html)
